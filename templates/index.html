@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>批量地理编码工具</title>
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>批量地理编码查询</h1>
+        <div class="input-section">
+            <!-- <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+                <input 
+                    type="password" 
+                    id="apiKey" 
+                    placeholder="输入高德API key (首次必填)"
+                    style="flex: 3; padding: 8px; min-width: 300px"
+                >
+                <button 
+                    onclick="saveApiKey()" 
+                    style="padding: 4px 8px; 
+                           font-size: 13px; 
+                           width: 80px;
+                           flex-shrink: 0;
+                           white-space: nowrap"
+                >保存</button>
+            </div> -->
+            <textarea id="coordinates" placeholder="请输入经纬度，每行一组，格式：经度,纬度&#10;示例：&#10;116.397128,39.916527&#10;121.473701,31.230416"></textarea>
+            <button onclick="geocode()">查询</button>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // 新增密钥保存方法
+        function saveApiKey() {
+            const apiKeyInput = document.getElementById('apiKey');
+            const apiKey = apiKeyInput.value.trim();
+            
+            if(apiKey) {
+                localStorage.setItem('AMAP_API_KEY', apiKey);
+                alert('API密钥已保存');
+                apiKeyInput.placeholder = "已保存密钥（输入新密钥可更新）";
+                apiKeyInput.value = ''; // 清空输入框
+            } else {
+                alert('请输入有效的API密钥');
+            }
+        }
+
+        // 修改原geocode方法中的密钥验证逻辑
+        async function geocode() {
+            const savedKey = localStorage.getItem('AMAP_API_KEY');
+            if(!savedKey) {
+                alert('请先输入并保存API密钥');
+                return;
+            }
+            const coordinates = document.getElementById('coordinates').value;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '查询中...';
+            
+            try {
+            
+                // 修改后（兼容不同环境）
+                const API_URL = window.location.hostname === 'localhost' 
+                  ? 'http://localhost:5000/geocode' 
+                  : '/geocode';
+                // 预留后期更改高德API key
+                const apiKey = localStorage.getItem('AMAP_API_KEY') || '9520b2b84749d53398a526740d32b7cd'; 
+
+                const response = await fetch(API_URL, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify({ coordinates: coordinates.split('\n'), apiKey})
+                });
+
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                resultsDiv.innerHTML = `错误：${error.message}`;
+            }
+        }
+
+        function displayResults(results) {
+            const html = `
+                <table>
+                    <tr>
+                        <th>经度</th>
+                        <th>纬度</th>
+                        <th>地址</th>
+                        <th>国家</th>
+                        <th>省份</th>
+                        <th>城市</th>
+                    </tr>
+                    ${results.map(item => `
+                        <tr>
+                            <td>${item.lon}</td>
+                            <td>${item.lat}</td>
+                            <td>${item.address || '未知'}</td>
+                            <td>${item.country || ''}</td>
+                            <td>${item.province || ''}</td>
+                            <td>${item.city || item.town || ''}</td>
+                        </tr>
+                    `).join('')}
+                </table>
+            `;
+            document.getElementById('results').innerHTML = html;
+        }
+    
+        // 页面加载时读取已存储的密钥
+        window.onload = function() {
+            const savedKey = localStorage.getItem('AMAP_API_KEY');
+            if(savedKey) {
+                document.getElementById('apiKey').placeholder = "已保存密钥（输入新密钥可更新）";
+            }
+        };
+    </script>
+</body>
+</html>
